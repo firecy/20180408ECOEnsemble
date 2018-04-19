@@ -87,10 +87,10 @@ def DGWDWC(C, clsnn, n_new, k, nMin):
             nMin.append(x_new)
     return nMin
 
-def CSOSDG(Min, cls, N_new, k, nn, CSO_type, batch_size):
-    if cls == 'Kmeans':
+def CSOSDG(Min, Cls, N_new, k, nn, CSO_type, batch_size):
+    if Cls == 'Kmeans':
         C, clsnn = train_Kmeans(Min=Min, k=k, nn=nn, batch_size=batch_size)
-    elif cls == 'HAC'：
+    elif Cls == 'HAC'：
         C, clsnn = train_AgglomerativeClustering(Min=Min, k=k, nn=nn)
     else:
         C, clsnn = train_BIRCH(Min=Min, k=k, nn=nn)

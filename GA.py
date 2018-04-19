@@ -12,31 +12,43 @@ import gc
 import pygmo as pg
 from sklearn.metrics import f1_score
 from IMDS import CSOSDG
+from PFL import model_train
 
-class pfl_fc_imb:
-    def __init__(self, Min, y, N_max, N_min):
-        self.Min = Min
-        self.y = y
-        self.N_max = N_max
-        self.N_min = N_min
-    def fitness(self, N_new, k, nn, cls, CSO_type):
-        Min_new = CSOSDG(self.Min, cls, N_new, k, nn, CSO_type, batch_size)
-        F1 = f1_score(self.y, y_test_pred, average='macro')
+# define a binary problem
+class BPFL_fc_imb:
+    def __init__(self, xMin, xMaj, yMin, yMaj, model_old, lr, epoch, batch_size):
+        self.xMin = xMin
+        self.yMin = yMin
+        self.xMaj = xMaj
+        self.yMaj = yMaj
+        self.model_old = model_old
+        self.lr = lr
+        self.epoch = epoch
+        self.batch_size = batch_size
+
+    # define fitness
+    def fitness(self, N_new, k, nn, Cls, CSO_type):
+        # generate new data
+        Min_new = CSOSDG(self.xMin, Cls, N_new, k, nn, CSO_type, batch_size)
+        # construct new dataset
+        x_new = np.vstack((self.xMaj, self.xMin, Min_new))
+        y_new = np.hstack((self.yMaj, self.yMin, np.ones(N_new, )*self.yMin[0]))
+        # finetune model based on new dataset
+        F1 = model_train(x=x_new, y=y_new, model=self.model_old,
+                         lr=self.lr, epoch=self.epoch, batch_size=self.batch_size)[0]
         return F1
+
+    # define bounds
     def get_bounds(self):
+        N_max = len(self.yMaj)
+        N_min = len(self.yMin)
         return ([0, N_max], [0, N_min/2], [0, N_min-1], [0, 2], [0, 1])
 
-def GA_training(dataset, y, pop_size, gen_max, cx, mx):
-    # define ranges of variables
-    # X is (data0set, data1set, ... ), dataset is array.
-    # y is (label0set, label1set, ...), labelset is vector.
-    num_x = []
-    for i in range(len(y)):
-        num_x.append(len(y[i]))
-    N_max = np.max(num_x)
-    N_min = np.min(num_x)
+# coding GA training and get best Ne(=pop_size) chromosomes
+def BGA_train(xMin, yMin, xMaj, yMaj, model_old, lr, epoch, batch_size, pop_size, gen_max, cx, mx):
     # define the problem
-    prob = pg.problem(pfl_fc_imb(dataset, y, N_max, N_min))
+    prob = pg.problem(BPFL_fc_imb(xMin, xMaj, yMin, yMaj,
+                                 model_old, lr, epoch, batch_size))
     # population initialization
     pop_init = pg.population(prob=prob, size=pop_size)
     # genetic algorithm construction
