@@ -557,9 +557,9 @@ def dataset_trans(dataset):
     return x0
 
 def samples_zca(x, x_mean, x_std, u, s, epsilon):
-    x_fea = fea_standardization(x, x_mean, x_std)
-    x_zca = zca_whitening(x_fea, u, s, epsilon)
-    x_zca = fea_stand_inverse(x, x_mean, x_std)
+    #x_fea = fea_standardization(x, x_mean, x_std)
+    x_zca = zca_whitening(x, u, s, epsilon)
+    #x_zca = fea_stand_inverse(x, x_mean, x_std)
     return x_zca
 
 def samples_tzca(x, x_mean, x_std, u, s, epsilon):

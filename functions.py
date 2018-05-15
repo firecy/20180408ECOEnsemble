@@ -72,7 +72,7 @@ def fea_stand_inverse(x, x_mean, x_std):
     return x
 
 def get_usv(x, x_mean, x_std):
-    x = fea_standardization(x, x_mean, x_std)
+    #x = fea_standardization(x, x_mean, x_std)
     cov = numpy.dot(x.T, x) / x.shape[0]
     u, s, v = numpy.linalg.svd(cov)
     return u, s
