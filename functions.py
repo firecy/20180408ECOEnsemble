@@ -66,6 +66,11 @@ def fea_standardization(x, x_mean, x_std):
     x[:, 0: 61] /= x_std[0: 61]
     return x
 
+def fea_stand_inverse(x, x_mean, x_std):
+    x[:, 0: 61] *= x_std[0: 61]
+    x[:, 0:61] += x_mean[0: 61]
+    return x
+
 def get_usv(x, x_mean, x_std):
     x = fea_standardization(x, x_mean, x_std)
     cov = numpy.dot(x.T, x) / x.shape[0]
