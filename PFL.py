@@ -36,9 +36,9 @@ from attention import *
 
 
 def repeatmat(C, timesteps, c_num):
-    reapeat_num = timesteps / c_num
+    reapeat_num = timesteps // c_num
     H2 = K.repeat_elements(C, reapeat_num, axis=1)
-    print H2.shape
+    print (H2.shape)
     return H2
 
 def create_lstmsae_model(input_dim, hidden_unit, initializer, batch_size, timesteps,
@@ -81,7 +81,7 @@ def train_lstmsae_model(trainset, hidden_unit, initializer, batch_size, c_num, l
                       nb_epoch=epoch, hidden_unit=hidden_unit, c_num=c_num)
     grid = GridSearchCV(estimator=model, param_grid=param_grid, n_jobs=-1,
                         scoring='r2', cv=10)
-    print "pr no fault"
+    print("pr no fault")
     grid_result = grid.fit(x, x)
     # summarize results
     print("Best: %f using %s" % (grid_result.best_score_, grid_result.best_params_))
@@ -114,7 +114,7 @@ def train_lstmclf_model(trainset, batch_size, output_dim, lr, fine_epoch, initia
                       nb_epoch=epoch)
     grid = GridSearchCV(estimator=model, param_grid=param_grid, n_jobs=-1,
                         scoring='accuracy', cv=10)
-    print "pr no fault"
+    print("pr no fault")
     grid_result = grid.fit(x, y)
     # summarize results
     print("Best: %f using %s" % (grid_result.best_score_, grid_result.best_params_))
@@ -318,7 +318,6 @@ def sampling(args, batch_size=1380, latent_dim=24, timesteps=1380, epsilon_std=0
                               mean=0., stddev=epsilon_std)
     return z_mean + K.exp(z_log_var / 2.) * epsilon
 
-
 def train_lstmvae_pflt_model2(dataset, hidden_list, initializer, c_num, lr1,
                             batch_size, pre_epoch, lr2, fine_epoch):
     x, y = dataset
@@ -371,7 +370,7 @@ def train_lstmvae_pflt_model2(dataset, hidden_list, initializer, c_num, lr1,
         kl_loss = -0.5 * K.sum(K.sum(1 + encoder_z_log_var - K.square(encoder_z_mean)
                   - K.exp(encoder_z_log_var), axis=-1))
         return xent_loss + kl_loss
-    VAE.compile(optimizer=adam, loss=vae_loss, metrics=['msle'])
+    VAE.compile(optimizer=adam, loss=vae_loss, metrics=['msle', 'mse'])
     # train model
     epochs = pre_epoch
     early_stopping = EarlyStopping(monitor='val_loss', patience=5)
@@ -379,11 +378,12 @@ def train_lstmvae_pflt_model2(dataset, hidden_list, initializer, c_num, lr1,
                 verbose=1, callbacks=[early_stopping], validation_split=0.2,
                 shuffle=True)
     # build classifier
-    classifier = LSTM(hidden_list[1],
-                    stateful=True,
+    #classifier = Lambda(repeatmat, arguments={'timesteps':c_num, 'c_num':c_num},
+    #                output_shape=(c_num, hidden_list[1]))(encoder)
+    classifier = LSTM(hidden_list[1], return_sequences=False,
                     kernel_initializer=initializer,
                     activity_regularizer=regularizers.l2(10e-10))(encoder)
-    classifier = Dense(nb_classes, activation='softmax')
+    classifier = Dense(nb_classes, activation='softmax')(classifier)
     PFL_model = Model(inputs=main_input, outputs=classifier)
     # compile PFL model
     adam = Adam(lr=lr2, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
@@ -393,36 +393,57 @@ def train_lstmvae_pflt_model2(dataset, hidden_list, initializer, c_num, lr1,
     PFL_model.fit(x=x, y=y_htc, batch_size=batch_size, epochs=fine_epoch,
                   verbose=1, callbacks=[early_stopping], validation_split=0.2,
                   shuffle=True)
-    return Encoder, Decoder, PFL_model
-def main():
-    x = np.load('data/codedata/80001_x_train.npy')
-    y = np.load('data/codedata/80001_y_train.npy')
-    x3 = np.load('data/codedata/80001_x_test.npy')
-    y3 = np.load('data/codedata/80001_y_test.npy')
-    x2 = np.zeros((len(x), x[0].shape[0], x[0].shape[1]))
-    x4 = np.zeros((len(x3), x3[0].shape[0], x3[0].shape[1]))
-    print y.shape
+    return PFL_model
+
+def missdata_implement(x, d):
+    print(d)
+    x2 = np.zeros((len(x), 1380, d))
     for i in range(len(x)):
-        x2[i] = x[i]
-    for i in range(len(x3)):
-        x4[i] = x3[i]
+        if x[i].shape[0] == 1380:
+            x2[i] = x[i]
+        else:
+            x1 = x[i]
+            x3 = -1 * np.ones((1380-x1.shape[0], x1.shape[1]))
+            x2[i] = np.vstack((x1, x3))
+    return x2
+
+def main():
+    x = np.load('dataset/codedata/80001/80001_xzca_train.npy', encoding='latin1')
+    y = np.load('dataset/codedata/80001/80001_y_train.npy', encoding='latin1')
+    x3 = np.load('dataset/codedata/80001/80001_xzca_test.npy', encoding='latin1')
+    y3 = np.load('dataset/codedata/80001/80001_y_test.npy', encoding='latin1')
+    x2 = missdata_implement(x, x[0].shape[1])
+    x4 = missdata_implement(x3, x3[0].shape[1])
+
+    print('finish data')
+    #x2 = np.zeros((len(x), x[0].shape[0], x[0].shape[1]))
+    #x4 = np.zeros((len(x3), x3[0].shape[0], x3[0].shape[1]))
+    #print y.shape
+    #for i in range(len(x)):
+    #    x2[i] = x[i]
+    #for i in range(len(x3)):
+    #    x4[i] = x3[i]
     y4 = np_utils.to_categorical(y3, 2)
+    print(len(x3))
     dataset = [x2, y]
-    batch_size = 2 #[5, 10, 20]
+    batch_size = 1 #[5, 10, 20]
     hidden_unit = [192, 10] #[24, 48, 96, 192, 384]
     c_cum = 690 #[10, 20, 23, 46, 60, 69, 138, 345]
     lr1 = 0.0003#[0.001, 0.003, 0.01, 0.03, 0.1, 0.3]
-    pre_epoch = 200 #[200, 500, 800, 1000]
+    pre_epoch = 1 #[200, 500, 800, 1000]
     lr2 = 0.003
-    fine_epoch = 2000
+    fine_epoch = 1
     initializer = 'orthogonal'
 
     model = train_lstmvae_pflt_model2(dataset=dataset,
                     hidden_list=hidden_unit, initializer=initializer,
                     c_num=c_cum, lr1=lr1, batch_size=batch_size,
                     pre_epoch=pre_epoch, lr2=lr2, fine_epoch=fine_epoch)
-    score = model.evaluate(x4, y4, batch_size=2)
-    print score
+    score = model.evaluate(x4, y4, batch_size=1)
+    y3_pre = np.argmax(model.predict(x4, batch_size=1), axis=1)
+    print(y3_pre)
+    print(y3)
+    print(score)
 
 
 if __name__ == '__main__':

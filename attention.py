@@ -18,28 +18,28 @@ class Attention(Layer):
                                   shape=(input_shape[0][-1], input_shape[1][-1]),
                                   initializer='orthogonal',
                                   trainable=True)
-        print self.W1.shape
+        print(self.W1.shape)
         self.W2 = self.add_weight(name='W2',
                                   shape=(self.c_num, self.timesteps),
                                   initializer='orthogonal',
                                   trainable=True)
         super(Attention, self).build(input_shape)
-        print self.W2.shape
+        print(self.W2.shape)
 
     def call(self, x):
         X, H = x
         X = K.dot(X, self.W1)
         #X = K.permute_dimensions(X, (0,2,1))
-        print H.shape, X.shape
+        print(H.shape, X.shape)
         A = K.batch_dot(X, H, axes=[2, 2]) / ((self.x_dim**0.5) * (self.h_dim**0.5))
-        print A.shape
+        print(A.shape)
         A = K.dot(self.W2, A)
-        print A.shape
+        print(A.shape)
         A = K.permute_dimensions(A, (1,0,2))
-        print A.shape
+        print(A.shape)
         A = K.softmax(A)
         C = K.batch_dot(A, H, axes=[2, 1])
-        print C.shape
+        print(C.shape)
         return C
 
     def compute_output_shape(self, input_shape):

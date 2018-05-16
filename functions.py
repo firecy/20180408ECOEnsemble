@@ -6,8 +6,7 @@ import timeit
 from datetime import datetime
 import time
 
-import numpy
-from numpy import *
+import numpy as np
 
 def minmax_standardization(x, x_min, x_max):
     '''
@@ -26,7 +25,7 @@ def minmax_standardization(x, x_min, x_max):
 def minmax_standardization4(x, x_min, x_max):
     for j in range(x.shape[1]):
         if x_min[j] < 0:
-            x = numpy.hstack((x, numpy.zeros((len(x), 1))))
+            x = np.hstack((x, np.zeros((len(x), 1))))
             for i in range(x.shape[0]):
                 if x[i, j] <= x_min[j]:
                     x[i, j] = 1.
@@ -71,22 +70,23 @@ def fea_stand_inverse(x, x_mean, x_std):
     x[:, 0:61] += x_mean[0: 61]
     return x
 
-def get_usv(x, x_mean, x_std):
-    #x = fea_standardization(x, x_mean, x_std)
-    cov = numpy.dot(x.T, x) / x.shape[0]
-    u, s, v = numpy.linalg.svd(cov)
+def get_usv(x):
+    x -= np.mean(x, axis=0)
+    cov = np.dot(x.T, x) / x.shape[0]
+    u, s, v = np.linalg.svd(cov)
     return u, s
 
-def zca_whitening(x, u, s, epsilon):
+def zca_whitening(x, u, s, x_mean, epsilon):
     '''
     this function is aimed to reduce the relevance of data and noises.
     '''
-    #x -= numpy.mean(x, axis=0)
-    #cov = numpy.dot(x.T, x)
-    #U, S, V = numpy.linalg.svd(cov)
-    xrot = numpy.dot(x, u)
-    xpcawhite = xrot / numpy.sqrt(s + epsilon)
-    xzcawhite = numpy.dot(xpcawhite, u.T)
+    x -= x_mean
+    #cov = np.dot(x.T, x)
+    #U, S, V = np.linalg.svd(cov)
+    xrot = np.dot(x, u)
+    xpcawhite = xrot / np.sqrt(s + epsilon)
+    xzcawhite = np.dot(xpcawhite, u.T)
+    #xzcawhite += x_mean
     return xzcawhite
 
 def ts_ms(ts):
