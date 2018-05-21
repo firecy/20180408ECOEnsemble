@@ -6,7 +6,7 @@ import timeit
 
 import numpy as np
 from functions import *
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
 def data_preprocessing3(insset):
     Weather = insset[0]

@@ -89,7 +89,6 @@ def train_lstmsae_model(trainset, hidden_unit, initializer, batch_size, c_num, l
     gc.collect()
     return grid_result.best_estimator_.model, grid_result.best_params_
 
-
 def create_lstmclf_model(input_dim, timesteps, batch_size, output_dim, lr):
     model = Sequential()
     model.add(LSTM(input_dim,
@@ -122,7 +121,7 @@ def train_lstmclf_model(trainset, batch_size, output_dim, lr, fine_epoch, initia
     gc.collect()
     return grid_result.best_estimator_.model, grid_result.best_params_
 
-def train_lstmsae_pflt_model1(dataset, hidden_unit, initializer, c_num, lr1,
+def train_lstmsae_pflt_model(dataset, hidden_unit, initializer, c_num, lr1,
                             batch_size, pre_epoch, lr2, fine_epoch):
     x, y = dataset
     nb_classes = len(set(y))
@@ -153,13 +152,14 @@ def train_lstmsae_pflt_model1(dataset, hidden_unit, initializer, c_num, lr1,
                   shuffle=True)
     return model, overparams
 
-def train_lstmsae_pflt_model3(dataset, hidden_unit, initializer, c_num, lr1,
+# lstm, attention, sae, pfl
+def train_lstmsae_pflt_model1(dataset, hidden_unit, initializer, c_num, lr1,
                             batch_size, pre_epoch, lr2, fine_epoch):
     x, y = dataset
     nb_classes = len(set(y))
     y_htc = np_utils.to_categorical(y, nb_classes)
-    timesteps = x[0].shape[0]
-    input_dim = x[0].shape[1]
+    timesteps = x.shape[1]
+    input_dim = x.shape[2]
     batch_size = batch_size #[5, 10, 20]
     hidden_unit = hidden_unit #[24, 48, 96, 192, 384]
     c_num = c_num #[10, 20, 23, 46, 60, 69, 138, 345]
@@ -170,10 +170,10 @@ def train_lstmsae_pflt_model3(dataset, hidden_unit, initializer, c_num, lr1,
     # build the encoder
     main_input = Input(batch_shape=(batch_size, timesteps, input_dim))
     encoder_x1 = LSTM(hidden_unit, return_sequences=True,
-                    stateful=True,
+                    stateful=True, activation='softsign',
                     kernel_initializer=initializer)(main_input)
     encoder_x2 = LSTM(hidden_unit, return_sequences=True,
-                    stateful=True, go_backwards=True,
+                    stateful=True, go_backwards=True, activation='softsign',
                     kernel_initializer=initializer)(main_input)
     encoder_h = merge([encoder_x1, encoder_x2], mode='concat')
     encoder_c = Attention(c_num=c_num, timesteps=timesteps,
@@ -181,32 +181,34 @@ def train_lstmsae_pflt_model3(dataset, hidden_unit, initializer, c_num, lr1,
     # build decoder
     decoder = Lambda(repeatmat, arguments={'timesteps':timesteps, 'c_num':c_num},
                     output_shape=(timesteps, hidden_unit*2))(encoder_c)
-    decoder = LSTM(input_dim, return_sequences=True,
+    decoder = LSTM(input_dim, return_sequences=True, activation='softsign',
                    stateful=True, kernel_initializer=initializer)(decoder)
     model = Model(inputs=main_input, outputs=decoder)
-    adam = Adam(lr=lr1, beta_1=0.9, beta_2=0.999, epsilon=1e-8, decay=0.0)
+    rmsprop = RMSprop(lr=lr1)
     #optimizer = RMSprop(lr=lr1)
-    model.compile(optimizer=adam, loss='msle', metrics=['mae'])
-    #early_stopping = EarlyStopping(monitor='val_loss', patience=5)
+    model.compile(optimizer=rmsprop, loss='msle', metrics=['mae', 'mse'])
+    early_stopping = EarlyStopping(monitor='val_loss', patience=10)
     model.fit(x=x, y=x, batch_size=batch_size, epochs=pre_epoch,
                   verbose=1, validation_split=0.2,
-                  shuffle=True)
+                  shuffle=True,
+                  callbacks=[early_stopping ])
     # build clf
     cfl = Lambda(repeatmat, arguments={'timesteps':c_num, 'c_num':c_num},
                     output_shape=(timesteps, hidden_unit*2))(encoder_c)
-    cfl = LSTM(hidden_unit, return_sequences=False,
+    cfl = LSTM(hidden_unit, return_sequences=False, activation='softsign',
                     kernel_initializer='orthogonal')(cfl)
     cfl = Dense(nb_classes, activation='softmax')(cfl)
     pfl = Model(inputs=main_input, outputs=cfl)
-    adam = Adam(lr=lr2, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
-    pfl.compile(optimizer=adam, loss='categorical_crossentropy', metrics=['accuracy'])
-    early_stopping = EarlyStopping(monitor='val_loss', patience=5)
+    rmsprop = RMSprop(lr=lr2)
+    pfl.compile(optimizer=rmsprop, loss='categorical_crossentropy', metrics=['accuracy'])
+    early_stopping = EarlyStopping(monitor='val_loss', patience=10)
     pfl.fit(x=x, y=y_htc, batch_size=batch_size, epochs=fine_epoch,
                   verbose=1, callbacks=[early_stopping], validation_split=0.2,
                   shuffle=True)
     return pfl
 
-def train_lstmsae_pflt_model4(dataset, hidden_unit, initializer, c_num, lr1,
+# lstm, vector, sae, pfl
+def train_lstmsae_pflt_model2(dataset, hidden_unit, initializer, c_num, lr1,
                             batch_size, pre_epoch, lr2, fine_epoch):
     x, y = dataset
     nb_classes = len(set(y))
@@ -224,93 +226,35 @@ def train_lstmsae_pflt_model4(dataset, hidden_unit, initializer, c_num, lr1,
     main_input = Input(batch_shape=(batch_size, timesteps, input_dim))
     encoder_x1 = LSTM(hidden_unit, return_sequences=True, activation='softsign',
                     stateful=True,
-                    kernel_initializer=initializer,
-                    activity_regularizer=regularizers.l2(10e-7))(main_input)
+                    kernel_initializer=initializer)(main_input)
     encoder_x2 = LSTM(hidden_unit, return_sequences=True, activation='softsign',
                     stateful=True, go_backwards=True,
-                    kernel_initializer=initializer,
-                    activity_regularizer=regularizers.l2(10e-7))(main_input)
+                    kernel_initializer=initializer)(main_input)
     encoder_h = merge([encoder_x1, encoder_x2], mode='concat')
     encoder_c = LSTM(hidden_unit, return_sequences=False, activation='softsign',
-                    kernel_initializer=initializer,
-                    activity_regularizer=regularizers.l2(10e-7))(encoder_h)
+                    kernel_initializer=initializer)(encoder_h)
     # build decoder
     decoder = RepeatVector(timesteps)(encoder_c)
     decoder = LSTM(input_dim, return_sequences=True, activation='softsign',
-                   stateful=True, kernel_initializer=initializer,
-                   activity_regularizer=regularizers.l2(10e-7))(decoder)
+                   stateful=True, kernel_initializer=initializer)(decoder)
     model = Model(inputs=main_input, outputs=decoder)
-    adam = Adam(lr=lr1, beta_1=0.9, beta_2=0.999, epsilon=1e-8, decay=0.0)
+    rmsprop = RMSprop(lr=lr1)
     #optimizer = RMSprop(lr=lr1)
-    model.compile(optimizer=adam, loss='msle', metrics=['mae'])
+    model.compile(optimizer=rmsprop, loss='msle', metrics=['mae', 'mse'])
+    early_stopping = EarlyStopping(monitor='val_loss', patience=10)
     model.fit(x=x, y=x, batch_size=batch_size, epochs=pre_epoch,
-                  verbose=1, validation_split=0.2,
+                  verbose=1, validation_split=0.2, callbacks=[early_stopping],
                   shuffle=True)
     # build clf
     cfl = Dense(nb_classes, activation='softmax')(encoder_c)
     pfl = Model(inputs=main_input, outputs=cfl)
-    adam = Adam(lr=lr2, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
-    pfl.compile(optimizer=adam, loss='categorical_crossentropy', metrics=['accuracy'])
-    early_stopping = EarlyStopping(monitor='val_loss', patience=5)
+    rmsprop = RMSprop(lr=lr2)
+    pfl.compile(optimizer=rmsprop, loss='categorical_crossentropy', metrics=['accuracy'])
+    early_stopping = EarlyStopping(monitor='val_loss', patience=10)
     pfl.fit(x=x, y=y_htc, batch_size=batch_size, epochs=fine_epoch,
                   verbose=1, callbacks=[early_stopping], validation_split=0.3,
                   shuffle=True)
     return pfl
-
-def train_lstmsae_pflt_model2(dataset, hidden_unit, initializer, c_num, lr1,
-                            batch_size, pre_epoch, lr2, fine_epoch):
-    x, y = dataset
-    nb_classes = len(set(y))
-    y_htc = np_utils.to_categorical(y, nb_classes)
-    timesteps = x.shape[1]
-    input_dim = x.shape[2]
-    batch_size = batch_size
-    # build encoder
-    main_input = Input(batch_shape=(batch_size, timesteps, input_dim))
-    encoder1 = LSTM(hidden_unit, return_sequences=True,
-                    stateful=True,
-                    kernel_initializer=initializer,
-                    activity_regularizer=regularizers.l2(10e-10))(main_input)
-    encoder2 = LSTM(hidden_unit, return_sequences=True,
-                    stateful=True, go_backwards=True,
-                    kernel_initializer=initializer,
-                    activity_regularizer=regularizers.l2(10e-10))(main_input)
-    encoder = Concatenate([encoder1, encoder2])
-    encoder = Lambda(attention(c_num=c_num),
-                    output_shape=(c_num, hidden_unit))(encoder)
-    # build encoder
-    decoder = Lambda(attention_inverse(timesteps=timesteps),
-                    output_shape=(batch_size, timesteps, hidden_unit))(encoder)
-    decoder = LSTM(input_dim, return_sequences=True,
-                   stateful=True, kernel_initializer=initializer,
-                   activity_regularizer=regularizers.l2(10e-10))(decoder)
-    Decoder = Model(inputs=main_input, outputs=decoder)
-    Encoder = Model(inputs=main_input, outputs=encoder)
-    # compile model
-    adam = Adam(lr=lr1, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
-    Decoder.compile(optimizer=adam, loss='mse')
-    # train model
-    epochs = pre_epoch
-    early_stopping = EarlyStopping(monitor='val_loss', patience=5)
-    Decoder.fit(x=x, y=x, batch_size=batch_size, epochs=pre_epoch,
-                verbose=1, callbacks=[early_stopping], validation_split=0.3,
-                shuffle=True)
-    # build classifier
-    classifier = LSTM(hidden_unit,
-                    stateful=True,
-                    kernel_initializer=initializer,
-                    activity_regularizer=regularizers.l2(10e-10))(encoder)
-    classifier = Dense(nb_classes, activation='softmax')
-    PFL_model = Model(inputs=main_input, outputs=classifier)
-    # compile PFL model
-    adam = Adam(lr=lr2, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
-    PFL_model.compile(optimizer=adam, loss='categorical_crossentropy', metrics=['accuracy'])
-    # train PFL model
-    epochs = fine_epoch
-    PFL_model.fit(x=x, y=y_htc, batch_size=batch_size, epochs=fine_epoch,
-                  verbose=1, callbacks=[early_stopping], validation_split=0.3,
-                  shuffle=True)
-    return Encoder, Decoder, PFL_model
 
 def sampling(args, batch_size=1380, latent_dim=24, timesteps=1380, epsilon_std=0.01):
     z_mean, z_log_var = args
@@ -318,7 +262,8 @@ def sampling(args, batch_size=1380, latent_dim=24, timesteps=1380, epsilon_std=0
                               mean=0., stddev=epsilon_std)
     return z_mean + K.exp(z_log_var / 2.) * epsilon
 
-def train_lstmvae_pflt_model2(dataset, hidden_list, initializer, c_num, lr1,
+# lstm, attention, vae, pfl
+def train_lstmvae_pflt_model1(dataset, hidden_list, initializer, c_num, lr1,
                             batch_size, pre_epoch, lr2, fine_epoch):
     x, y = dataset
     nb_classes = len(set(y))
@@ -407,6 +352,17 @@ def missdata_implement(x, d):
             x2[i] = np.vstack((x1, x3))
     return x2
 
+def save_model(model, model_path, weights_path):
+    model = model
+    json_string = model.to_json()
+    open(model_path, 'w').write(json_string)
+    model.save_weights(weights_path)
+
+def load_model(model_path, weights_path):
+    model = model_from_json(open(model_path).read())
+    model.load_weights(weights_path)
+    return model
+
 def main():
     x = np.load('dataset/codedata/80001/80001_xzca_train.npy', encoding='latin1')
     y = np.load('dataset/codedata/80001/80001_y_train.npy', encoding='latin1')
@@ -416,29 +372,55 @@ def main():
     x4 = missdata_implement(x3, x3[0].shape[1])
 
     print('finish data')
-    #x2 = np.zeros((len(x), x[0].shape[0], x[0].shape[1]))
-    #x4 = np.zeros((len(x3), x3[0].shape[0], x3[0].shape[1]))
-    #print y.shape
-    #for i in range(len(x)):
-    #    x2[i] = x[i]
-    #for i in range(len(x3)):
-    #    x4[i] = x3[i]
     y4 = np_utils.to_categorical(y3, 2)
     print(len(x3))
     dataset = [x2, y]
-    batch_size = 1 #[5, 10, 20]
-    hidden_unit = [192, 10] #[24, 48, 96, 192, 384]
-    c_cum = 690 #[10, 20, 23, 46, 60, 69, 138, 345]
+    batch_size = 1#[5, 10, 20]
+    hidden_list = [192, 48]
+    hidden_unit = 192 #[24, 48, 96, 192, 384]
+    c_num = 345 #[10, 20, 23, 46, 60, 69, 138, 345]
     lr1 = 0.0003#[0.001, 0.003, 0.01, 0.03, 0.1, 0.3]
-    pre_epoch = 1 #[200, 500, 800, 1000]
+    pre_epoch = 500 #[200, 500, 800, 1000]
     lr2 = 0.003
-    fine_epoch = 1
+    fine_epoch = 1000
     initializer = 'orthogonal'
+    '''
+    model = train_lstmsae_pflt_model1(dataset=dataset,
+                                    hidden_unit=hidden_unit,
+                                    initializer=initializer,
+                                    c_num=c_num,
+                                    lr1=lr1,
+                                    batch_size=batch_size,
+                                    pre_epoch=pre_epoch,
+                                    lr2=lr2,
+                                    fine_epoch=fine_epoch)
+    '''
+    model = train_lstmsae_pflt_model2(dataset=dataset,
+                            hidden_unit=hidden_unit,
+                            initializer=initializer,
+                            c_num=c_num,
+                            lr1=lr1,
+                            batch_size=batch_size,
+                            pre_epoch=pre_epoch,
+                            lr2=lr2,
+                            fine_epoch=fine_epoch)
 
-    model = train_lstmvae_pflt_model2(dataset=dataset,
-                    hidden_list=hidden_unit, initializer=initializer,
-                    c_num=c_cum, lr1=lr1, batch_size=batch_size,
-                    pre_epoch=pre_epoch, lr2=lr2, fine_epoch=fine_epoch)
+    '''
+    model = train_lstmvae_pflt_model1(dataset=dataset,
+                                hidden_list=hidden_list,
+                                initializer=initializer,
+                                c_num=c_num,
+                                lr1=lr1,
+                                batch_size=batch_size,
+                                pre_epoch=pre_epoch,
+                                lr2=lr2,
+                                fine_epoch=fine_epoch)
+    '''
+
+    model_path = 'model/80001_lstmsaevec_architechture.json'
+    weights_path = 'model/80001_lstmsaevec_weights.h5'
+    save_model(model, model_path, weights_path)
+
     score = model.evaluate(x4, y4, batch_size=1)
     y3_pre = np.argmax(model.predict(x4, batch_size=1), axis=1)
     print(y3_pre)
