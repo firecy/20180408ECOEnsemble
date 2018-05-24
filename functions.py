@@ -80,13 +80,14 @@ def zca_whitening(x, u, s, x_mean, epsilon):
     '''
     this function is aimed to reduce the relevance of data and noises.
     '''
-    x -= x_mean
+    x[:, 0: 61] -= x_mean
     #cov = np.dot(x.T, x)
     #U, S, V = np.linalg.svd(cov)
-    xrot = np.dot(x, u)
+    xrot = np.dot(x[:, 0: 61], u)
     xpcawhite = xrot / np.sqrt(s + epsilon)
     xzcawhite = np.dot(xpcawhite, u.T)
-    #xzcawhite += x_mean
+    xzcawhite += x_mean
+    xzcawhite = np.hstack((xzcawhite, x[:, 61: 63]))
     return xzcawhite
 
 def ts_ms(ts):
