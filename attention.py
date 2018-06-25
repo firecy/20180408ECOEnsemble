@@ -5,7 +5,7 @@ from keras.engine.topology import Layer
 
 class Attention(Layer):
 
-    def __init__(self, c_num, timesteps, x_dim, h_dim, **kwargs):
+    def __init__(self, c_num=345, timesteps=1380, x_dim=96, h_dim=192, **kwargs):
         self.c_num = c_num
         self.timesteps = timesteps
         self.x_dim = x_dim

@@ -6,7 +6,7 @@ import timeit
 
 import numpy as np
 from functions import *
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
 def data_preprocessing3(insset):
     Weather = insset[0]
@@ -293,7 +293,7 @@ def Load_data(path, fault_code, epsilon):
                 TimeStamp_0 = str('2016_1_1_00:00:00:00')
                 TimeStamp_1 = str('2016_1_2_00:00:00:00')
                 ms_list = []
-                for i in xrange(len(value_name)):
+                for i in range(len(value_name)):
                     index[value_name[i]] = i                  #将原始数据分组标号
                 for (k, v) in index.items():
                     if Weather_index.has_key(k) == True:
@@ -499,7 +499,7 @@ def feature_segment(dataset):
     return weatherset, setpointset, variablesset
 
 def Data_segment(path, path_w, path_sp, path_v):
-    dataset = np.load(path, encoding='latin1')[0]
+    dataset = np.load(path, encoding='latin1')
     print (len(dataset))
     print (dataset.shape)
     wraw, spraw, vraw = feature_segment(dataset)
@@ -523,8 +523,8 @@ def variables_segment(path):
                         dataset[i][:, 53:56], dataset[i][:, 59:61]))
         v1set.append(v1)
         v2set.append(v2)
-    np.save('dataset/codedata/v1_train', v1set)
-    np.save('dataset/codedata/v2_train', v2set)
+    np.save('dataset/codedata/80001/80001_v1_train2', v1set)
+    np.save('dataset/codedata/80001/80001_v2_train2', v2set)
     return v1set, v2set
 
 def variables_conb(v1, v2):
@@ -572,22 +572,34 @@ def samples_tzca(x, u, s, x_mean, epsilon):
         xlist_zca.append(x_zca)
     return xlist_zca
 
+def missdata_implement(x, d):
+    print(d)
+    x2 = np.zeros((len(x), 1380, d))
+    for i in range(len(x)):
+        if x[i].shape[0] == 1380:
+            x2[i] = x[i]
+        else:
+            x1 = x[i]
+            x3 = -1 * np.ones((1380-x1.shape[0], x1.shape[1]))
+            x2[i] = np.vstack((x1, x3))
+    return x2
+
 def main():
     #path = 'data/codedata/x_train.npy'
-    #path = 'dataset/data/binary/910000-32/train'
+    #path = 'dataset/data/binary/80001_49/train'
     #epsilon = 0.1
     #x_test, y_test, fault_code, ft_test, ms_test = load_binarydata(path, epsilon)
-    #np.save('dataset/codedata/910000_x_train', x_test)
-    #np.save('dataset/codedata/910000_y_train', y_test)
+    #np.save('dataset/codedata/80001_x_train2', x_test)
+    #np.save('dataset/codedata/80001_y_train2', y_test)
     #np.save('data/codedata/labeled_ft_train', ft_test)
     #np.save('data2/codedata/labeled_ms_train', ms_test)
-    #print len(x_test), len(y_test)
-    #print y_test
+    #print (len(x_test), len(y_test))
+    #print (y_test)
 
-    #path_raw = 'dataset/codedata/newdata_all.npy'
-    #path_w = 'dataset/codedata/w_train'
-    #path_sp = 'dataset/codedata/sp_train'
-    #path_v = 'dataset/codedata/v_train.npy'
+    #path_raw = 'dataset/codedata/80001_x_train2.npy'
+    #path_w = 'dataset/codedata/80001/80001_w_train2'
+    #path_sp = 'dataset/codedata/80001/80001_sp_train2'
+    #path_v = 'dataset/codedata/80001/80001_v_train2.npy'
     #wraw, spraw, vraw = Data_segment(path_raw, path_w, path_sp, path_v)
     #print (len(wraw), len(spraw), len(vraw))
     #print (wraw[0].shape, spraw[0].shape, vraw[0].shape)
@@ -595,21 +607,21 @@ def main():
     #print (len(v1raw), len(v2raw), v1raw[0].shape, v2raw[0].shape)
 
     #limits = np.loadtxt('sp_limits.csv', delimiter=',')
-    #raw = np.load('dataset/codedata/sp_train.npy')
+    #raw = np.load('dataset/codedata/80001/80001_sp_train2.npy')
     #nor = samples_tnor(raw, limits)
-    #np.save('dataset/codedata/spnor_train', nor)
+    #np.save('dataset/codedata/80001/80001_spnor_train2', nor)
     #print (len(nor), nor[0].shape)
 
-    #v1 = np.load('dataset/codedata/v1nor_train.npy')
-    #v2 = np.load('dataset/codedata/v2nor_train.npy')
+    #v1 = np.load('dataset/codedata/80001/80001_v1nor_train2.npy', encoding='latin1')
+    #v2 = np.load('dataset/codedata/80001/80001_v2nor_train2.npy', encoding='latin1')
     #v = variables_conb(v1, v2)
     #print (v1[0].shape, v2[0].shape)
     #print (len(v), v[0].shape)
-    #np.save('dataset/codedata/vnor_train.npy', v)
+    #np.save('dataset/codedata/80001/80001_vnor_train2.npy', v)
 
     #vnor = list(np.load('data2/codedata/labeled_vnor_train.npy')) + list(np.load('data2/codedata/unlabeled_vnor_train.npy'))
     #vnor = np.load('data/codedata/80001_v_nor_train.npy')
-    #vnor = np.load('dataset/codedata/vnor_train.npy')
+    #vnor = np.load('dataset/codedata/vnor_train.npy', encoding='latin1')
     #print (len(vnor))
     #vtrans = dataset_trans(vnor)
     #vtrans = np.vstack((vnor))[:, 0: 61]
@@ -623,24 +635,32 @@ def main():
     #v_u = np.loadtxt('dataset/v_u61.csv', delimiter=',')
     #v_s = np.loadtxt('dataset/v_s61.csv', delimiter=',')
     #print(v_s)
-    #plt.figure()
-    #plt.plot(v_s)
-    #plt.show()
     #v_mean = np.loadtxt('dataset/v_mean61.csv', delimiter=',')
-    #vnor = np.load('dataset/codedata/vnor_train.npy')
+    #vnor = np.load('dataset/codedata/910000/910000_vnor_test.npy', encoding='latin1')
     #print (v_mean.shape, v_u.shape, v_s.shape, vnor.shape)
     #vnortrans = dataset_trans(vnor)
     #vzca = samples_tzca(vnor, v_u, v_s, v_mean, epsilon=0.01)
-    #np.save('dataset/codedata/vzca_train.npy', vzca)
+    #np.save('dataset/codedata/910000/910000_vzca61_test.npy', vzca)
     #print (len(vzca), vzca[0].shape, vzca[0])
 
-    wnor = np.load('dataset/codedata/wnor_train.npy')
-    spnor = np.load('dataset/codedata/spnor_train.npy')
-    vzca = np.load('dataset/codedata/vzca_train.npy')
-    print(len(wnor), len(spnor), len(vzca))
-    xzca = x_conb(wnor, spnor, vzca)
+    wnor = np.load('dataset/codedata/wnor_train.npy', encoding='latin1')
+    wnor = missdata_implement(wnor, wnor[0].shape[1])
+    print(wnor.shape)
+    spnor = np.load('dataset/codedata/spnor_train.npy', encoding='latin1')
+    spnor = missdata_implement(spnor, spnor[0].shape[1])
+    print(spnor.shape)
+    vzca = np.array(np.load('dataset/codedata/vnor_train.npy', encoding='latin1'))
+    vzca = missdata_implement(vzca, vzca[0].shape[1])
+    print(vzca.shape)
+    xzca = np.concatenate((wnor, spnor, vzca), axis=2)
+    print(xzca.shape)
+    #wnor = np.load('dataset/codedata/80001/80001_wnor_train2.npy', encoding='latin1')
+    #spnor = np.load('dataset/codedata/80001/80001_spnor_train2.npy', encoding='latin1')
+    #vzca = np.load('dataset/codedata/80001/80001_vnor_train2.npy', encoding='latin1')
+    #print(len(wnor), len(spnor), len(vzca))
+    #xzca = x_conb(wnor, spnor, vzca)
     print(len(xzca), xzca[0].shape)
-    np.save('dataset/codedata/xzca_train.npy', xzca)
+    np.save('dataset/codedata/xnor_train2.npy', xzca)
 
     #xzca = list(np.load('data2/codedata/labeled_xzca_train.npy')) + list(np.load('data2/codedata/unlabeled_xzca_train.npy'))
     #print len(xzca)
