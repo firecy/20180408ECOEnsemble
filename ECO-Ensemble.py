@@ -57,7 +57,7 @@ def BECO_Ensemble_PFL(x, model_lists, error_lists):
     Ye_prob = np.zeros((x.shape[0], 2))
     # ensemble with combined output
     for i in range(len(model_lists)):
-        y_prob = model_lists[i].predict(x, batch_size=10)
+        y_prob = model_lists[i].predict(x, batch_size=1)
         w = error_lists[i] / np.sum(error_lists)
         Ye_prob += w * y_prob
     return Ye_prob
